@@ -1,0 +1,67 @@
+name: Blog Publisher
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  publish-blog-post:
+    if: contains(github.event.issue.labels.*.name, 'APPROVED')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Generate blog post
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        ISSUE_TITLE: ${{ github.event.issue.title }}
+        ISSUE_BODY: ${{ github.event.issue.body }}
+        ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        ISSUE_CREATED_AT: ${{ github.event.issue.created_at }}
+        ISSUE_UPDATED_AT: ${{ github.event.issue.updated_at }}
+      run: node scripts/generate-blog-post.js
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Build site
+      run: |
+        # Ensure docs directory exists
+        mkdir -p docs
+        # Copy any additional assets if needed
+        if [ -d "assets" ]; then
+          cp -r assets docs/
+        fi
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './docs'
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+    
+    - name: Commit generated files
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Add blog post: ${{ github.event.issue.title }}"
+          git push
+        fi
