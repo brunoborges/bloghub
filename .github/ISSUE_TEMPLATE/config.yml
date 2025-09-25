@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions - Questions & Feedback
+    url: https://github.com/brunoborges/bloghub/discussions
+    about: Ask questions, share feedback, or discuss blog topics
+  - name: 📖 Existing Blog Posts
+    url: https://brunoborges.github.io/bloghub
+    about: Read existing blog posts and join their discussions
+  - name: 🍴 Fork This Repository
+    url: https://github.com/brunoborges/bloghub/fork
+    about: Create your own blog using this system

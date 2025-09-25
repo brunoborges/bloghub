@@ -18,6 +18,8 @@ A GitHub-powered blogging platform that uses **Issues as your content editor** a
 - 📱 **Mobile Responsive**: Looks great on all devices
 - 🔒 **Version Control**: All your content is versioned in Git
 - 🆓 **Free Hosting**: Powered by GitHub Pages
+- 🔒 **Owner Protection**: Only repository owner can create issues/posts
+- 💬 **Discussion Integration**: Each post gets its own GitHub Discussion thread
 
 ## 🎯 Getting Started
 
@@ -29,9 +31,12 @@ A GitHub-powered blogging platform that uses **Issues as your content editor** a
 
 ### 2. Create Your First Blog Post
 
+**Note**: Only the repository owner can create issues. If someone else tries to create an issue, it will be automatically closed with an explanation.
+
 1. Go to the **Issues** tab
 2. Click **"New Issue"**
-3. Write your blog post:
+3. **Select "📝 Blog Post"** template (provides helpful guidance)
+4. Write your blog post:
    - **Title**: This becomes your blog post title
    - **Body**: Write your content in Markdown format
 4. Add the `APPROVED` label
@@ -57,6 +62,20 @@ bloghub/
 ├── README.md                  # This file
 └── .gitignore                # Git ignore rules
 ```
+
+## 🛡️ Issue Protection & Community
+
+### Repository Owner Only
+Only the repository owner can create issues to maintain editorial control. If others try to create issues, they'll be automatically closed with a helpful message explaining alternatives.
+
+### Community Engagement
+While only owners can create posts, everyone can:
+- 💬 **Join Discussions**: Each blog post has its own GitHub Discussion thread
+- 🍴 **Fork & Create**: Fork the repository to start your own blog
+- ⭐ **Show Support**: Star the repository if you find it useful
+- 📧 **Direct Contact**: Reach out to the owner for collaboration
+
+See [ISSUE_PROTECTION.md](ISSUE_PROTECTION.md) for technical details.
 
 ## 🔧 Customization
 

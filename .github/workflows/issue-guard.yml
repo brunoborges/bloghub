@@ -1,0 +1,46 @@
+name: Issue Guard
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  check-issue-author:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check if issue author is repository owner
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        REPO_OWNER: ${{ github.repository_owner }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+      run: |
+        echo "Issue author: $ISSUE_AUTHOR"
+        echo "Repository owner: $REPO_OWNER"
+        
+        if [ "$ISSUE_AUTHOR" != "$REPO_OWNER" ]; then
+          echo "Issue created by non-owner. Closing issue..."
+          
+          # Close the issue with a comment
+          curl -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{
+              "body": "Thank you for your interest in contributing! However, only the repository owner (@'"$REPO_OWNER"') can create issues in this blog repository.\n\n## 💬 For Questions, Comments, or Feedback\nPlease use the **[Discussions tab](https://github.com/'"${{ github.repository }}"'/discussions)** instead:\n- 🗣️ Ask questions about blog content\n- 💭 Share feedback or suggestions  \n- 🎯 Discuss topics related to posts\n\n## 🍴 Want Your Own Blog?\n- Fork this repository to create your own blog\n- Enable GitHub Pages in your fork settings\n- Start creating your own posts\n\n## � Read Existing Posts\nVisit the blog at: https://'"$REPO_OWNER"'.github.io/'"$(echo "${{ github.repository }}" | cut -d'/' -f2)"'\n\nThis issue will be automatically closed. Please use the links above for engagement!"
+            }' \
+            "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments"
+          
+          # Close the issue
+          curl -X PATCH \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{"state": "closed"}' \
+            "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER"
+          
+          echo "Issue #$ISSUE_NUMBER has been closed."
+        else
+          echo "Issue created by repository owner. No action needed."
+        fi
