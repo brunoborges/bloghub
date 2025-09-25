@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 // Get issue data from environment variables
 const issueNumber = process.env.ISSUE_NUMBER;
@@ -14,6 +15,142 @@ const issueUpdatedAt = process.env.ISSUE_UPDATED_AT;
 if (!issueNumber || !issueTitle) {
     console.error('Missing required environment variables');
     process.exit(1);
+}
+
+// Function to create GitHub Discussion
+async function createGitHubDiscussion(title, body) {
+    const token = process.env.GITHUB_TOKEN;
+    const repository = process.env.GITHUB_REPOSITORY;
+    
+    if (!token || !repository) {
+        console.warn('GitHub token or repository not available, skipping discussion creation');
+        return null;
+    }
+
+    const [owner, repo] = repository.split('/');
+    
+    // First, get the repository ID and discussion categories
+    const repoQuery = `
+        query {
+            repository(owner: "${owner}", name: "${repo}") {
+                id
+                discussionCategories(first: 10) {
+                    nodes {
+                        id
+                        name
+                        slug
+                    }
+                }
+            }
+        }
+    `;
+
+    try {
+        const repoData = await makeGraphQLRequest(token, repoQuery);
+        const repositoryId = repoData.data.repository.id;
+        const categories = repoData.data.repository.discussionCategories.nodes;
+        
+        // Find the "bloghub" category first, fallback to "General" or "Announcements", then first available
+        let categoryId = categories.find(cat => 
+            cat.name.toLowerCase() === 'bloghub' ||
+            cat.slug === 'bloghub'
+        )?.id;
+        
+        if (!categoryId) {
+            categoryId = categories.find(cat => 
+                cat.name.toLowerCase() === 'general' || 
+                cat.name.toLowerCase() === 'announcements' ||
+                cat.slug === 'general' ||
+                cat.slug === 'announcements'
+            )?.id;
+        }
+        
+        if (!categoryId && categories.length > 0) {
+            categoryId = categories[0].id;
+        }
+        
+        if (!categoryId) {
+            console.warn('No discussion categories found, skipping discussion creation');
+            return null;
+        }
+
+        // Create the discussion
+        const createDiscussionMutation = `
+            mutation {
+                createDiscussion(input: {
+                    repositoryId: "${repositoryId}"
+                    categoryId: "${categoryId}"
+                    title: "${title.replace(/"/g, '\\"')}"
+                    body: "${body.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
+                }) {
+                    discussion {
+                        id
+                        number
+                        url
+                        title
+                    }
+                }
+            }
+        `;
+
+        const discussionData = await makeGraphQLRequest(token, createDiscussionMutation);
+        
+        if (discussionData.data && discussionData.data.createDiscussion) {
+            const discussion = discussionData.data.createDiscussion.discussion;
+            console.log(`Created GitHub Discussion: ${discussion.url}`);
+            return discussion;
+        } else {
+            console.warn('Failed to create discussion:', discussionData.errors);
+            return null;
+        }
+    } catch (error) {
+        console.warn('Error creating GitHub Discussion:', error.message);
+        return null;
+    }
+}
+
+// Helper function to make GraphQL requests
+function makeGraphQLRequest(token, query) {
+    return new Promise((resolve, reject) => {
+        const data = JSON.stringify({ query });
+        
+        const options = {
+            hostname: 'api.github.com',
+            port: 443,
+            path: '/graphql',
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Content-Length': data.length,
+                'User-Agent': 'BlogHub-Script/1.0'
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let responseData = '';
+
+            res.on('data', (chunk) => {
+                responseData += chunk;
+            });
+
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(responseData);
+                    resolve(parsed);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            reject(error);
+        });
+
+        req.write(data);
+        req.end();
+    });
 }
 
 // Create docs directory if it doesn't exist
@@ -114,12 +251,22 @@ function processInlineMarkdown(text) {
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 }
 
-// Create HTML template for blog post
-const htmlContent = `<!DOCTYPE html>
+// Main execution function
+async function main() {
+    // Create the discussion first
+    const discussionBody = `This is a discussion thread for the blog post: **${issueTitle}**\n\n${issueBody.substring(0, 500)}${issueBody.length > 500 ? '...' : ''}\n\n[Read the full article →](https://${process.env.GITHUB_REPOSITORY.split('/')[0]}.github.io/${process.env.GITHUB_REPOSITORY.split('/')[1]}/posts/${fileName})`;
+    
+    const discussion = await createGitHubDiscussion(issueTitle, discussionBody);
+
+    // Create HTML template for blog post
+    const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>${escapeHtml(issueTitle)} - BlogHub</title>
     <link rel="stylesheet" href="../styles.css">
 </head>
@@ -148,6 +295,17 @@ const htmlContent = `<!DOCTYPE html>
             <div class="article-content">
                 ${simpleMarkdownToHtml(issueBody)}
             </div>
+            
+            ${discussion ? `
+            <div class="discussion-section">
+                <hr>
+                <h3>💬 Discussion</h3>
+                <p>Have thoughts, questions, or feedback about this post? Join the discussion!</p>
+                <p><a href="${discussion.url}" target="_blank" class="discussion-link">
+                    💬 Comment and discuss on GitHub →
+                </a></p>
+            </div>
+            ` : ''}
         </article>
     </main>
     
@@ -158,13 +316,23 @@ const htmlContent = `<!DOCTYPE html>
 </body>
 </html>`;
 
-// Write the blog post file
-fs.writeFileSync(filePath, htmlContent);
+    // Write the blog post file
+    fs.writeFileSync(filePath, htmlContent);
 
-// Update or create the blog index
-updateBlogIndex();
+    // Update or create the blog index
+    updateBlogIndex();
 
-console.log(`Generated blog post: ${fileName}`);
+    console.log(`Generated blog post: ${fileName}`);
+    if (discussion) {
+        console.log(`Discussion created: ${discussion.url}`);
+    }
+}
+
+// Execute main function
+main().catch(error => {
+    console.error('Error generating blog post:', error);
+    process.exit(1);
+});
 
 // Helper functions
 function escapeHtml(text) {
@@ -193,9 +361,7 @@ function updateBlogIndex() {
     
     if (fs.existsSync(postsDir)) {
         const postFiles = fs.readdirSync(postsDir)
-            .filter(file => file.endsWith('.html'))
-            .sort()
-            .reverse(); // Most recent first
+            .filter(file => file.endsWith('.html'));
         
         for (const file of postFiles) {
             const fullPath = path.join(postsDir, file);
@@ -206,16 +372,24 @@ function updateBlogIndex() {
             const dateMatch = content.match(/<span class="date">(.*?)<\/span>/);
             const authorMatch = content.match(/<span class="author">By (.*?)<\/span>/);
             
+            // Extract date from filename for better sorting
+            const dateFromFilename = file.match(/^(\d{4}-\d{2}-\d{2})/);
+            const sortDate = dateFromFilename ? new Date(dateFromFilename[1]) : new Date(0);
+            
             if (titleMatch) {
                 posts.push({
                     filename: file,
                     title: titleMatch[1],
                     date: dateMatch ? dateMatch[1] : '',
                     author: authorMatch ? authorMatch[1] : '',
-                    url: `posts/${file}`
+                    url: `posts/${file}`,
+                    sortDate: sortDate
                 });
             }
         }
+        
+        // Sort posts by creation date, newest first
+        posts.sort((a, b) => b.sortDate - a.sortDate);
     }
     
     // Generate index.html
@@ -224,6 +398,9 @@ function updateBlogIndex() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>BlogHub - GitHub-Powered Blog</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -282,4 +459,25 @@ function updateBlogIndex() {
     
     fs.writeFileSync(path.join(docsDir, 'index.html'), indexContent);
     console.log('Updated blog index');
+}
+
+// Helper functions
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+function formatDate(date) {
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
 }
