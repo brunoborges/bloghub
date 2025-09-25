@@ -23,16 +23,13 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
-    
+      uses: actions/checkout@v5
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: '18'
-    
     - name: Generate blog post
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,9 +41,6 @@ jobs:
         ISSUE_UPDATED_AT: ${{ github.event.issue.updated_at }}
       run: node scripts/generate-blog-post.js
     
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-    
     - name: Build site
       run: |
         # Ensure docs directory exists
@@ -55,16 +49,6 @@ jobs:
         if [ -d "assets" ]; then
           cp -r assets docs/
         fi
-    
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: './docs'
-    
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
-    
     - name: Commit generated files
       run: |
         git config --local user.email "action@github.com"
