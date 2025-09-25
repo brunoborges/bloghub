@@ -2,7 +2,7 @@ name: Blog Publisher
 
 on:
   issues:
-    types: [closed]
+    types: [closed, edited]
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -33,6 +33,7 @@ jobs:
     - name: Generate blog post
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_EVENT_ACTION: ${{ github.event.action }}
         ISSUE_NUMBER: ${{ github.event.issue.number }}
         ISSUE_TITLE: ${{ github.event.issue.title }}
         ISSUE_BODY: ${{ github.event.issue.body }}
@@ -57,6 +58,10 @@ jobs:
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Add blog post: ${{ github.event.issue.title }}"
+          if [ "${{ github.event.action }}" = "edited" ]; then
+            git commit -m "Update blog post: ${{ github.event.issue.title }}"
+          else
+            git commit -m "Add blog post: ${{ github.event.issue.title }}"
+          fi
           git push
         fi

@@ -11,10 +11,44 @@ const issueBody = process.env.ISSUE_BODY || '';
 const issueAuthor = process.env.ISSUE_AUTHOR;
 const issueCreatedAt = process.env.ISSUE_CREATED_AT;
 const issueUpdatedAt = process.env.ISSUE_UPDATED_AT;
+const issueAction = process.env.GITHUB_EVENT_ACTION || 'closed'; // 'closed' or 'edited'
 
 if (!issueNumber || !issueTitle) {
     console.error('Missing required environment variables');
     process.exit(1);
+}
+
+// Function to find existing blog post by issue number
+function findExistingBlogPost(issueNum) {
+    if (!fs.existsSync(postsDir)) {
+        return null;
+    }
+    
+    const postFiles = fs.readdirSync(postsDir)
+        .filter(file => file.endsWith('.html'));
+    
+    for (const file of postFiles) {
+        const fullPath = path.join(postsDir, file);
+        const content = fs.readFileSync(fullPath, 'utf8');
+        
+        // Look for the issue link that contains this issue number
+        const issueLinkMatch = content.match(/View Original Issue #(\d+)/);
+        if (issueLinkMatch && issueLinkMatch[1] === issueNum) {
+            return {
+                filename: file,
+                path: fullPath,
+                content: content
+            };
+        }
+    }
+    
+    return null;
+}
+
+// Function to extract existing discussion URL from blog post
+function extractDiscussionUrl(htmlContent) {
+    const discussionMatch = htmlContent.match(/<a href="([^"]*discussions[^"]*)" target="_blank" class="discussion-link">/);
+    return discussionMatch ? discussionMatch[1] : null;
 }
 
 // Function to create GitHub Discussion
@@ -253,10 +287,28 @@ function processInlineMarkdown(text) {
 
 // Main execution function
 async function main() {
-    // Create the discussion first
-    const discussionBody = `This is a discussion thread for the blog post: **${issueTitle}**\n\n${issueBody.substring(0, 500)}${issueBody.length > 500 ? '...' : ''}\n\n[Read the full article →](https://${process.env.GITHUB_REPOSITORY.split('/')[0]}.github.io/${process.env.GITHUB_REPOSITORY.split('/')[1]}/posts/${fileName})`;
+    console.log(`Processing issue #${issueNumber} (${issueAction}): ${issueTitle}`);
     
-    const discussion = await createGitHubDiscussion(issueTitle, discussionBody);
+    // Check if this is an update to an existing post
+    const existingPost = findExistingBlogPost(issueNumber);
+    let discussion = null;
+    let existingDiscussionUrl = null;
+    
+    if (existingPost) {
+        console.log(`Found existing blog post: ${existingPost.filename}`);
+        existingDiscussionUrl = extractDiscussionUrl(existingPost.content);
+        if (existingDiscussionUrl) {
+            console.log(`Preserving existing discussion: ${existingDiscussionUrl}`);
+            // Create a mock discussion object with the existing URL
+            discussion = { url: existingDiscussionUrl };
+        }
+    }
+    
+    // Only create a new discussion if this is a new post (no existing post found)
+    if (!existingPost && !discussion) {
+        const discussionBody = `This is a discussion thread for the blog post: **${issueTitle}**\n\n${issueBody.substring(0, 500)}${issueBody.length > 500 ? '...' : ''}\n\n[Read the full article →](https://${process.env.GITHUB_REPOSITORY.split('/')[0]}.github.io/${process.env.GITHUB_REPOSITORY.split('/')[1]}/posts/${fileName})`;
+        discussion = await createGitHubDiscussion(issueTitle, discussionBody);
+    }
 
     // Create HTML template for blog post
     const htmlContent = `<!DOCTYPE html>
@@ -322,9 +374,16 @@ async function main() {
     // Update or create the blog index
     updateBlogIndex();
 
-    console.log(`Generated blog post: ${fileName}`);
-    if (discussion) {
+    if (existingPost) {
+        console.log(`Updated existing blog post: ${fileName}`);
+    } else {
+        console.log(`Generated new blog post: ${fileName}`);
+    }
+    
+    if (discussion && !existingDiscussionUrl) {
         console.log(`Discussion created: ${discussion.url}`);
+    } else if (existingDiscussionUrl) {
+        console.log(`Discussion preserved: ${existingDiscussionUrl}`);
     }
 }
 
