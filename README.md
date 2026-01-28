@@ -11,15 +11,34 @@ A GitHub-powered blogging platform that uses **Issues as your content editor** a
 
 ## ✨ Features
 
+### Core Features
 - 📝 **Markdown Editor**: Use GitHub Issues as your familiar Markdown editor
 - 🤖 **Automatic Publishing**: GitHub Actions automatically converts and deploys posts
 - 🎨 **Beautiful Design**: Clean, responsive blog design
-- 🔗 **SEO Friendly**: Proper HTML structure with meta tags
 - 📱 **Mobile Responsive**: Looks great on all devices
 - 🔒 **Version Control**: All your content is versioned in Git
 - 🆓 **Free Hosting**: Powered by GitHub Pages
 - 🔒 **Owner Protection**: Only repository owner can create issues/posts
 - 💬 **Discussion Integration**: Each post gets its own GitHub Discussion thread
+
+### SEO & Discovery
+- 🔗 **SEO Optimized**: Meta tags, Open Graph, and Twitter Cards for social sharing
+- 📡 **RSS Feed**: Subscribers can follow your blog via `feed.xml`
+- 🗺️ **Sitemap**: Automatic `sitemap.xml` generation for search engines
+- 🔍 **Client-Side Search**: Fast search across all posts
+
+### User Experience
+- 🌙 **Dark Mode**: Toggle between light and dark themes
+- 🏷️ **Tags & Categories**: Organize posts with labels (uses GitHub Issue labels)
+- 📖 **Reading Time**: Estimated reading time for each post
+- 📄 **Post Excerpts**: Automatic excerpt generation for post previews
+- 📑 **Pagination**: Paginated post listing for better navigation
+- ✨ **Syntax Highlighting**: Beautiful code blocks with Prism.js
+
+### Content Management
+- ✏️ **Edit Posts**: Update posts by editing the issue (with `APPROVED` label)
+- 🗑️ **Unpublish Posts**: Remove the `APPROVED` label to unpublish
+- 📊 **Full Markdown**: Tables, blockquotes, images, lists, and more
 
 ## 🎯 Getting Started
 
@@ -52,15 +71,20 @@ Your blog will be available at: `https://yourusername.github.io/repositoryname`
 ```
 bloghub/
 ├── .github/workflows/
-│   └── blog-publisher.yml     # GitHub Actions workflow
+│   ├── blog-publisher.yml     # GitHub Actions workflow
+│   └── issue-guard.yml        # Owner-only issue protection
 ├── scripts/
 │   └── generate-blog-post.js  # Blog post generator script  
 ├── docs/
-│   ├── index.html             # Blog homepage
-│   ├── styles.css             # Blog styling
+│   ├── index.html             # Blog homepage (with search & pagination)
+│   ├── styles.css             # Blog styling (with dark mode)
+│   ├── feed.xml               # RSS feed (auto-generated)
+│   ├── sitemap.xml            # Sitemap (auto-generated)
+│   ├── search-index.json      # Search index (auto-generated)
+│   ├── posts-metadata.json    # Post metadata (auto-generated)
 │   └── posts/                 # Generated blog posts
 ├── README.md                  # This file
-└── .gitignore                # Git ignore rules
+└── .gitignore                 # Git ignore rules
 ```
 
 ## 🛡️ Issue Protection & Community
@@ -81,7 +105,7 @@ See [ISSUE_PROTECTION.md](ISSUE_PROTECTION.md) for technical details.
 
 ### Styling
 
-Edit `docs/styles.css` to customize the appearance of your blog.
+Edit `docs/styles.css` to customize the appearance of your blog. The CSS uses CSS variables for easy theming and includes built-in dark mode support.
 
 ### Blog Generator
 
@@ -91,20 +115,42 @@ Modify `scripts/generate-blog-post.js` to change how blog posts are generated fr
 
 Edit `.github/workflows/blog-publisher.yml` to customize the publishing process.
 
+## 🏷️ Using Tags
+
+Add labels to your GitHub Issues to categorize posts:
+
+1. Create labels in your repository (e.g., `javascript`, `tutorial`, `announcement`)
+2. Add labels to your issue before closing
+3. The `APPROVED` label is reserved for publishing - other labels become tags
+4. Readers can filter posts by tag on the blog homepage
+
 ## 📖 Writing Tips
 
 ### Markdown Support
 
 Your blog posts support full Markdown including:
 
-- **Headers**: `# ## ###`
-- **Bold/Italic**: `**bold**` `*italic*`
+- **Headers**: `# ## ### #### #####`
+- **Bold/Italic**: `**bold**` `*italic*` `~~strikethrough~~`
 - **Links**: `[text](url)`
-- **Images**: `![alt](url)`
-- **Code**: `` `inline` `` and ```code blocks```
-- **Lists**: Bullet and numbered lists
+- **Images**: `![alt](url)` (lazy-loaded automatically)
+- **Code**: `` `inline` `` and fenced code blocks with syntax highlighting
+- **Lists**: Bullet (`-`, `*`, `+`) and numbered lists
 - **Tables**: GitHub-flavored markdown tables
 - **Blockquotes**: `> quote text`
+- **Horizontal Rules**: `---` or `***`
+
+### Syntax Highlighting
+
+Code blocks support syntax highlighting for many languages:
+
+```javascript
+function hello() {
+    console.log("Hello, BlogHub!");
+}
+```
+
+Supported languages include: JavaScript, TypeScript, Python, Bash, JSON, YAML, CSS, Java, Go, Rust, and more.
 
 ### Example Issue Template
 
@@ -144,6 +190,8 @@ export ISSUE_TITLE="Test Post"
 export ISSUE_BODY="# Hello World\nThis is a test post."
 export ISSUE_AUTHOR="yourusername"  
 export ISSUE_CREATED_AT="2024-01-01T00:00:00Z"
+export ISSUE_UPDATED_AT="2024-01-02T00:00:00Z"
+export ISSUE_LABELS='[{"name": "tutorial"}, {"name": "javascript"}]'
 export GITHUB_REPOSITORY="yourusername/bloghub"
 
 # Run the generator
@@ -153,8 +201,17 @@ node scripts/generate-blog-post.js
 ### Workflow Testing
 
 The GitHub Actions workflow is triggered when:
-- An issue is closed
-- The issue has the `APPROVED` label
+- An issue is **closed** with the `APPROVED` label → publishes the post
+- An issue is **edited** with the `APPROVED` label → updates the post
+- The `APPROVED` label is **removed** → unpublishes the post
+
+## 📡 RSS & Sitemap
+
+Your blog automatically generates:
+- **RSS Feed**: `https://yourusername.github.io/bloghub/feed.xml`
+- **Sitemap**: `https://yourusername.github.io/bloghub/sitemap.xml`
+
+Submit the sitemap to Google Search Console for better SEO.
 
 ## 📋 Requirements
 
